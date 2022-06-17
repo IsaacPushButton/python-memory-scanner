@@ -4,37 +4,35 @@ from utils import vmmap, enc, search, int_to_bytes, b
 import mach
 
 
-secret_value = "Godfrey"
-secret_value2 = "Morbog"
-secret_value3 = 12345678
-
-PROGRAM_PID = 29809
-
-VALUE = 10
-
+PROGRAM_PID = 46012
 
 vmap = vmmap(PROGRAM_PID)
+
 repeats = {}
 found = None
 i = 0
 while not found:
     VALUE = enc(input("Enter changed value: "))
-    if VALUE == "*":
-        matches = [v for k,v in new_repeats.items()]
+
+    if isinstance(VALUE, str) and VALUE[0] == "*":
+        if len(VALUE) == 1:
+            matches = [v for k, v in new_repeats.items()]
+        else:
+            matches = [[v for k, v in new_repeats.items()][int(VALUE[1])]]
         found = []
         [found.extend(list(i)) for i in matches]
         break
+
     locations = search(VALUE, vmap)
-    print(f"Value found in {len(locations)} locations: {locations}")
+    #print(f"Value found in {len(locations)} locations: {locations}")
     if not repeats:
         repeats = locations
     else:
         new_repeats = {}
-        for k,v in repeats.items():
+        for k, v in repeats.items():
             if new_locations := locations.get(k):
                 matches = v.intersection(new_locations)
                 if matches:
-
                     new_repeats[k] = matches
         repeats = new_repeats
         if not repeats:
@@ -54,11 +52,10 @@ while True:
     new_value = b(new_value)
     for i in found:
         print(f"Writing {new_value} to {i}")
-        #mach.vm_protect(vmap.port, i, len(new_value), mach.VM_PROT_WRITE)
         mach.vm_write(vmap.port, i, new_value)
-        confirm = mach.vm_read(vmap.port, i, len(new_value))
-        assert new_value == confirm
-        print(confirm)
+        confirm_post = mach.vm_read(vmap.port, i, 4)
+        assert new_value == confirm_post
+
 
 
 

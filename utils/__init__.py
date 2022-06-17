@@ -5,8 +5,8 @@ import mach
 import subprocess
 from ast import literal_eval
 
-BIT = 16
-ENDIANNESS = "big"
+BIT = 32
+ENDIANNESS = "little"
 INT_LEN = BIT // 8
 
 class RegionRecurseOutput(BaseModel):
@@ -89,7 +89,7 @@ def enc(s: Union[str,int]):
 
 def b(s: Union[str,int]):
     if isinstance(s, int):
-        return int_to_bytes(s, length=INT_LEN)
+        return int_to_bytes(s, signed=True, length=INT_LEN)
     else:
         return s.encode("utf-8")
 
@@ -110,13 +110,22 @@ def read_memory_map(port: int, mem: MemoryMapRow):
 
 def search(value: any, map: MemoryMap):
     found_in = {}
-    for v in variations(value):
-        print(f"Searching for {v}")
-        for map_location in map.mem:
+    vc = 0
+    mc = 0
+    for map_location in map.mem:
+        mc = mc + 1
+        try:
+            m = read_memory_map(map.port, map_location)
+        except mach.MachError as e:
+            print(e)
+            continue
+        for v in variations(value):
+            vc = vc + 1
             try:
-                matches = find_all_instances(read_memory_map(map.port, map_location), v)
+                #if map_location.start <= 4299436936 <= map_location.end:
+                matches = find_all_instances(m, v)
                 if matches:
-                    found_in[f"{map_location.name}"] = set([i + map_location.start for i in matches])
+                    found_in[f"{map_location.name}-{mc}"] = set([i + map_location.start for i in matches])
             except mach.MachError as e:
                 print(f"failed to load {map_location.name}: {e}")
     return found_in
@@ -133,16 +142,26 @@ def save_memory(memory_lump : bytes):
 
 
 
-
 def variations(i: Union[str,int, bytes]) :
     if isinstance(i, bytes):
         return [i]
     if isinstance(i, int):
         return [
-            int_to_bytes(i, signed=True, length=INT_LEN),
-           # int_to_bytes(i, signed=False),
-           # int_to_bytes(i, signed=True, byteorder="little"),
-           # int_to_bytes(i, signed=False, byteorder="little"),
+            #int_to_bytes(i, length=2, signed=True, byteorder="big"),
+            #int_to_bytes(i, length=2,signed=False, byteorder="big"),
+            #int_to_bytes(i, length=2,signed=True, byteorder="little"),
+            #int_to_bytes(i, length=2,signed=False, byteorder="little"),
+
+            int_to_bytes(i, length=4, signed=True, byteorder="big"),
+            int_to_bytes(i, length=4, signed=False, byteorder="big"),
+            int_to_bytes(i, length=4, signed=True, byteorder="little"),
+            int_to_bytes(i, length=4, signed=False, byteorder="little"),
+
+         #   int_to_bytes(i, length=8, signed=True, byteorder="big"),
+         ##   int_to_bytes(i, length=8, signed=False, byteorder="big"),
+         #   int_to_bytes(i, length=8, signed=True, byteorder="little"),
+         #   int_to_bytes(i, length=8, signed=False, byteorder="little"),
+
         ]
     else:
         return [i.encode("utf-8"), i.encode("ascii")]
